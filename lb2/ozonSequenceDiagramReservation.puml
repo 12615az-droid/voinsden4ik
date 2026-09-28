@@ -1,0 +1,38 @@
+@startuml
+title Бронирование и самовывоз товара из ПВЗ Ozon
+
+actor Покупатель
+participant "Приложение Ozon" as App
+participant "Сервер Ozon" as Server
+participant "Система управления складом" as Warehouse
+participant "Терминал ПВЗ" as Terminal
+
+Покупатель -> App: Выбрать товар и самовывоз
+App -> Server: Запросить резервирование
+Server -> Warehouse: Зарезервировать товар
+Warehouse --> Server: Резерв создан
+Server --> App: Подтвердить резерв
+
+Покупатель -> App: Оплатить товар
+App -> Server: Подтвердить оплату
+Server --> App: Сформировать код получения
+App --> Покупатель: Показать код
+
+Покупатель -> Terminal: Предъявить код
+Terminal -> Server: Проверить код и резерв
+
+alt Резерв действителен
+    Server -> Warehouse: Списать товар
+    Warehouse --> Server: Товар списан
+    Server --> Terminal: Разрешить выдачу
+    Terminal --> Покупатель: Выдать товар
+
+else Время резерва истекло
+    Server -> Warehouse: Снять резерв
+    Warehouse -> Warehouse: Вернуть товар в продажу
+    Server --> Terminal: Отказать в выдаче
+    Server --> App: Уведомить об истечении резерва
+    App --> Покупатель: Резерв истек
+end
+
+@enduml

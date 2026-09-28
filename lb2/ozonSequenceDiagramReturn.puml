@@ -1,0 +1,28 @@
+@startuml
+title Возврат товара через ПВЗ Ozon
+
+actor Покупатель
+participant "Личный кабинет Ozon" as Cabinet
+participant "Сервис возвратов Ozon" as Return
+participant "Сотрудник ПВЗ Ozon" as Employee
+participant "Служба контроля качества" as Quality
+
+Покупатель -> Cabinet: Создать заявку на возврат
+Cabinet -> Return: Передать заявку
+Return --> Cabinet: Сформировать QR-код
+Cabinet --> Покупатель: Показать QR-код
+
+Покупатель -> Employee: Передать товар и QR-код
+Employee -> Return: Сканировать QR-код
+Return --> Employee: Подтвердить прием товара
+Return -> Quality: Отправить товар на проверку
+
+alt Товар соответствует требованиям
+    Quality -> Return: Подтвердить возврат
+    Return --> Покупатель: Возврат денежных средств
+else Обнаружены повреждения
+    Quality -> Return: Отклонить возврат
+    Return --> Покупатель: Уведомить об отказе
+end
+
+@enduml
