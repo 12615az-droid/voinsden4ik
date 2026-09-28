@@ -1,0 +1,45 @@
+@startuml
+left to right direction
+
+actor Customer
+actor Supplier
+actor Delivery
+actor  Bank
+
+rectangle "Ozon Belarus" {
+
+  (View Products)
+  (Place Order)
+  (Pay for Order)
+  (Installment Payment)
+
+  (Order Delivery)
+  (Track Delivery)
+
+  (Manage Products)
+  (Process Orders)
+
+  (Additional Delivery Services)
+}
+
+Customer --> (View Products)
+Customer --> (Place Order)
+Customer --> (Pay for Order)
+Customer --> (Track Delivery)
+
+Supplier --> (Manage Products)
+Supplier --> (Process Orders)
+
+Delivery --> (Order Delivery)
+Delivery --> (Track Delivery)
+
+Bank --> (Pay for Order)
+Bank --> (Installment Payment)
+
+(Place Order) .> (Pay for Order) : <<include>>
+(Place Order) .> (Order Delivery) : <<include>>
+
+(Installment Payment) .> (Pay for Order) : <<extend>>
+(Additional Delivery Services) .> (Order Delivery) : <<extend>>
+
+@enduml
