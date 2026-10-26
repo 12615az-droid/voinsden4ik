@@ -1,0 +1,43 @@
+@startuml
+title Ozon Беларусь — возврат товара
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam wrapWidth 170
+skinparam nodesep 35
+skinparam ranksep 45
+
+package "Клиент" {
+  component "Личный кабинет\n(веб)" as Web
+}
+
+node "Собственные серверы компании" {
+  component "Балансировщик" as LB
+  component "Сервис возвратов" as Returns
+  component "Складская система\n(WMS)" as WMS
+  component "Контроль качества" as QC
+  component "Сервис платежей" as Payments
+  database "БД заказов" as DB
+  folder "Акты и фото" as Files
+}
+
+node "Пункт выдачи (ПВЗ)" {
+  component "Терминал\nсо сканером" as Terminal
+}
+
+Web --> LB : HTTPS
+LB --> Returns : HTTPS\nзаявка
+Returns --> WMS : REST/HTTPS\nприёмка
+Terminal --> WMS : HTTPS/TLS\nкод товара
+WMS --> QC : REST/HTTPS\nпроверка
+QC --> Returns : REST/HTTPS\nрезультат
+Returns --> Payments : REST/HTTPS\nвозврат денег
+Returns --> DB : SQL/TLS\nстатус
+QC --> Files : HTTPS\nакт, фото
+
+@enduml

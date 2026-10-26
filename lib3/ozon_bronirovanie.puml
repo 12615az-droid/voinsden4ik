@@ -1,0 +1,43 @@
+@startuml
+title Ozon Беларусь — бронирование и самовывоз
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam wrapWidth 170
+skinparam nodesep 35
+skinparam ranksep 45
+
+package "Клиент" {
+  component "Приложение Ozon" as Mobile
+}
+
+node "Собственные серверы компании" {
+  component "Балансировщик" as LB
+  component "Сервис бронирования" as Booking
+  component "Складская система\n(WMS)" as WMS
+  database "Кэш брони\n(срок действия — TTL)" as Cache
+  database "БД заказов" as DB
+}
+
+node "Пункт выдачи (ПВЗ)" {
+  component "Терминал\nсо сканером" as Terminal
+}
+
+Mobile --> LB : HTTPS
+LB --> Booking : HTTPS\nзаявка
+Booking --> WMS : REST/HTTPS\nпроверка и резерв
+Booking --> Cache : Redis/TLS\nсрок брони
+Booking --> DB : SQL/TLS\nстатус
+WMS --> Terminal : HTTPS/TLS\nкод брони
+Terminal --> WMS : HTTPS/TLS\nподтверждение выдачи
+
+note bottom of Cache
+  После истечения TTL
+  резерв снимается в WMS.
+end note
+@enduml
