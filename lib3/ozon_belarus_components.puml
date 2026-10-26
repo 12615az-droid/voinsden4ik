@@ -1,1 +1,125 @@
+@startuml
+' Архитектурная модель (не описание фактической инфраструктуры Ozon)
+title Ozon Беларусь — диаграмма компонентов\nВозвраты и бронирование с самовывозом
+left to right direction
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam linetype ortho
+skinparam wrapWidth 160
+skinparam maxMessageSize 90
+skinparam defaultFontName Arial
+skinparam backgroundColor #FFFFFF
 
+actor "Покупатель" as Buyer
+actor "Инспектор ОТК" as Inspector
+
+package "Клиентская часть" as Clients {
+  component "Личный кабинет\n(веб-интерфейс)" as Web <<Web>>
+  component "Мобильное приложение\nOzon" as Mobile <<Mobile>>
+}
+
+node "Собственный ЦОД компании (on-premises)" as DC {
+  package "Шлюзы и балансировка" {
+    node "Сервер LB-1" {
+      component "Балансировщик\nнагрузки №1" as LB1
+    }
+    node "Сервер LB-2" {
+      component "Балансировщик\nнагрузки №2" as LB2
+    }
+  }
+
+  package "Выделенные серверы бизнес-логики" {
+    node "Серверы API-1 / API-2" {
+      component "API-шлюз\nаутентификация и маршрутизация" as API
+    }
+    node "Сервер возвратов" {
+      component "Сервис возвратов" as Returns
+    }
+    node "Сервер бронирования" {
+      component "Сервис бронирования" as Booking
+    }
+    node "Сервер платежей" {
+      component "Сервис платежей" as Payments
+    }
+  }
+
+  package "Хранение данных" {
+    node "Сервер БД" {
+      database "Основная БД заказов\nзаказы, возвраты, выдачи" as Orders
+    }
+    node "Сервер кэширования" {
+      database "Кэш бронирований\nключ резерва + TTL" as Cache
+    }
+    node "Файловый сервер" {
+      folder "Файловое хранилище\nакты, фото, документы" as Files
+    }
+  }
+
+  package "Операционные системы" {
+    node "Сервер WMS" {
+      component "Система управления складом\nостатки по каждому ПВЗ" as WMS
+    }
+    node "Сервер контроля качества" {
+      component "Система контроля качества\nпроверка возвратов" as QC
+    }
+  }
+}
+
+package "Фирменные пункты выдачи (сеть компании)" as Pickup {
+  node "Терминал ПВЗ со сканером" {
+    component "ПО терминала\nприёмка и выдача" as Terminal
+  }
+}
+
+Buyer --> Web
+Buyer --> Mobile
+Web -[#1976D2]-> LB1 : [В1] HTTPS/TLS\nсоздание возврата
+Mobile -[#2E7D32]-> LB2 : [Б1] HTTPS/TLS\nсоздание брони
+Web ..[#999999]> LB2 : HTTPS/TLS (резерв)
+Mobile ..[#999999]> LB1 : HTTPS/TLS (резерв)
+LB1 --> API : HTTPS/mTLS\nбалансировка запросов
+LB2 --> API : HTTPS/mTLS\nбалансировка запросов
+
+API -[#1976D2]-> Returns : [В2] REST/HTTPS + mTLS\nID заказа, позиции, причина
+API -[#2E7D32]-> Booking : [Б2] REST/HTTPS + mTLS\nтовар, количество, ПВЗ
+
+Returns -[#1976D2]-> WMS : [В3] REST/HTTPS + mTLS\nприём возврата, ID, код товара
+WMS -[#1976D2]-> QC : [В4] REST/HTTPS + mTLS\nзадача осмотра, состояние товара
+QC -[#1976D2]-> Returns : [В5] REST/HTTPS + mTLS\nрешение по возврату
+Returns -[#1976D2]-> Payments : [В6] REST/HTTPS + mTLS\nсумма, ID возврата, запрос возврата денег
+
+Booking -[#2E7D32]-> WMS : [Б3] REST/HTTPS + mTLS\nпроверить остаток / установить / снять резерв
+Booking -[#2E7D32]-> Cache : Redis RESP/TLS\nключ брони, ПВЗ, TTL
+WMS -[#2E7D32]-> Terminal : [Б4] VPN/IPsec + HTTPS/mTLS\nкод брони, задание на выдачу, статус
+Terminal -[#2E7D32]-> WMS : [Б5] VPN/IPsec + HTTPS/mTLS\nотсканированный код, факт выдачи
+
+Returns --> Orders : SQL/TLS\nстатус возврата, заказ
+Booking --> Orders : SQL/TLS\nID брони, срок действия, статус
+Payments --> Orders : SQL/TLS\nсумма, статус операции
+WMS --> Orders : SQL/TLS\nсобытия приёмки / выдачи
+Returns --> Files : HTTPS/S3 API (on-prem)\nакт и вложения
+QC --> Files : HTTPS/S3 API (on-prem)\nфото и заключение
+Inspector --> QC : HTTPS/TLS (внутренняя сеть)\nрезультат проверки
+
+note right of Booking
+  **Резерв на ограниченное время**
+  TTL хранится в кэше.
+  При истечении срока сервис снимает
+  резерв в WMS и обновляет статус в БД.
+end note
+
+note bottom of Terminal
+  Терминалы расположены в ПВЗ компании.
+  Связь с ЦОД — через защищённый VPN.
+  Сканирование используется и при возврате,
+  и при самовывозе.
+end note
+
+legend bottom
+  <color:#1976D2>━━</color> [В] Сценарий возврата товара
+  <color:#2E7D32>━━</color> [Б] Сценарий бронирования и самовывоза
+  Серые связи — инфраструктура и хранение данных.
+  Все серверные компоненты размещены на инфраструктуре компании.
+endlegend
+@enduml
